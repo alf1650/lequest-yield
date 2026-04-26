@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LEQUEST — Property Yield Calculator</title>
+  <meta name="description" content="Rental yield, cash-on-cash, IRR and break-even calculator for LEQUEST (2-bed, 2-bath)." />
+  <style>
+    :root {
+      --blue: #1a56db;
+      --blue-light: #e8f0fe;
+      --green: #046c4e;
+      --green-light: #def7ec;
+      --red: #c81e1e;
+      --red-light: #fde8e8;
+      --orange: #b45309;
+      --orange-light: #fffbeb;
+      --gray: #6b7280;
+      --gray-light: #f9fafb;
+      --border: #e5e7eb;
+      --text: #111827;
+      --card-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f3f4f6;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #1a56db 100%);
+      color: white;
+      padding: 36px 24px 32px;
+      text-align: center;
+    }
+    .header .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    .header p  { font-size: 15px; opacity: 0.9; }
+    .header .meta {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 24px;
+      margin-top: 20px;
+      font-size: 13px;
+    }
+    .header .meta span { opacity: 0.85; }
+
+    .container { max-width: 1160px; margin: 0 auto; padding: 24px 16px 48px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: white;
+      border-radius: 12px;
+      box-shadow: var(--card-shadow);
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: .3px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .panel-header .dot {
+      display: inline-block;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--blue); margin-right: 8px;
+    }
+    .panel-body { padding: 16px 18px; }
+
+    .field {
+      display: grid;
+      grid-template-columns: 1fr 140px;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .field:last-child { border-bottom: none; }
+    .field label {
+      font-size: 13px;
+      color: #374151;
+    }
+    .field label .hint {
+      display: block;
+      font-size: 11px;
+      color: var(--gray);
+      margin-top: 2px;
+    }
+    .field input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      text-align: right;
+      background: var(--gray-light);
+    }
+    .field input:focus { outline: none; border-color: var(--blue); background: white; }
+    .field input[readonly] { background: #eef2ff; color: var(--blue); font-weight: 600; cursor: not-allowed; }
+
+    .field-row-derived {
+      display: flex; justify-content: space-between;
+      padding: 10px 0; margin-top: 4px;
+      border-top: 1px dashed var(--border);
+      font-size: 13px;
+    }
+    .field-row-derived strong { color: var(--blue); font-weight: 700; }
+
+    .toolbar {
+      display: flex; gap: 8px;
+    }
+    .btn {
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: white;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .btn:hover { background: var(--gray-light); }
+    .btn-primary { background: var(--blue); color: white; border-color: var(--blue); }
+    .btn-primary:hover { background: #1543b3; }
+
+    /* KPI cards */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .kpi {
+      background: white;
+      border-radius: 10px;
+      padding: 14px;
+      box-shadow: var(--card-shadow);
+      border-left: 4px solid var(--gray);
+    }
+    .kpi .label { font-size: 11px; color: var(--gray); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+    .kpi .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+    .kpi .sub { font-size: 11px; color: var(--gray); margin-top: 2px; }
+    .kpi.good { border-left-color: var(--green); }
+    .kpi.good .value { color: var(--green); }
+    .kpi.warn { border-left-color: var(--orange); }
+    .kpi.warn .value { color: var(--orange); }
+    .kpi.bad { border-left-color: var(--red); }
+    .kpi.bad .value { color: var(--red); }
+
+    /* Breakdown table */
+    table.breakdown {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    table.breakdown td {
+      padding: 6px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    table.breakdown td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+    table.breakdown tr.total td {
+      font-weight: 700;
+      border-top: 2px solid var(--border);
+      border-bottom: none;
+      padding-top: 10px;
+      color: var(--text);
+    }
+    table.breakdown tr.subtle td { color: var(--gray); font-size: 12px; }
+
+    /* Collapsible panels */
+    details.panel summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      font-weight: 700;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    details.panel summary::-webkit-details-marker { display: none; }
+    details.panel:not([open]) summary { border-bottom: none; }
+    details.panel summary::after {
+      content: '▾';
+      font-size: 14px;
+      color: var(--gray);
+      transition: transform .15s ease;
+    }
+    details.panel[open] summary::after { transform: rotate(180deg); }
+
+    .footer {
+      text-align: center; font-size: 12px; color: var(--gray);
+      margin-top: 32px; padding: 16px;
+    }
+    .footer a { color: var(--blue); text-decoration: none; }
+
+    .note {
+      font-size: 12px; color: var(--gray);
+      background: var(--orange-light);
+      border: 1px solid #fcd34d;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <span class="badge">Investment Property</span>
+    <h1>LEQUEST · Yield Calculator</h1>
+    <p>2-Bedroom, 2-Bath · Kids pool access · Second residential property</p>
+    <div class="meta">
+      <span>Purchase: <strong>S$900,000</strong></span>
+      <span>BSD 3% + ABSD 7% · <strong>S$90,000</strong></span>
+      <span>Auto-saved locally</span>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <div class="layout">
+      <!-- ── INPUTS ──────────────────────────────────────── -->
+      <div>
+        <div class="panel">
+          <div class="panel-header">
+            <span><span class="dot"></span>Acquisition (one-off)</span>
+            <div class="toolbar">
+              <button class="btn" id="btnReset">Reset</button>
+            </div>
+          </div>
+          <div class="panel-body" id="acqBody"></div>
+        </div>
+
+        <div class="panel" style="margin-top:16px;">
+          <div class="panel-header"><span><span class="dot"></span>CPF (Ordinary Account)</span></div>
+          <div class="panel-body" id="cpfBody"></div>
+        </div>
+
+        <details class="panel" style="margin-top:16px;">
+          <summary><span><span class="dot"></span>Financing (loan paid off — expand for what-if)</span></summary>
+          <div class="panel-body" id="loanBody"></div>
+        </details>
+
+        <div class="panel" style="margin-top:16px;">
+          <div class="panel-header"><span><span class="dot"></span>Income</span></div>
+          <div class="panel-body" id="incomeBody"></div>
+        </div>
+
+        <div class="panel" style="margin-top:16px;">
+          <div class="panel-header"><span><span class="dot"></span>Recurring costs (annual)</span></div>
+          <div class="panel-body" id="costsBody"></div>
+        </div>
+
+        <div class="panel" style="margin-top:16px;">
+          <div class="panel-header"><span><span class="dot"></span>Exit (for IRR)</span></div>
+          <div class="panel-body" id="exitBody"></div>
+        </div>
+      </div>
+
+      <!-- ── OUTPUTS ─────────────────────────────────────── -->
+      <div>
+        <div class="panel">
+          <div class="panel-header"><span><span class="dot"></span>Annual cashflow breakdown</span></div>
+          <div class="panel-body">
+            <table class="breakdown" id="cashflowTable"></table>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:16px;">
+          <div class="panel-header"><span><span class="dot"></span>Acquisition summary</span></div>
+          <div class="panel-body">
+            <table class="breakdown" id="acqTable"></table>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:16px;">
+          <div class="panel-header"><span><span class="dot"></span>Notes &amp; assumptions</span></div>
+          <div class="panel-body">
+            <div class="note" id="notesBox"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      Local-only · figures saved in your browser via <code>localStorage</code> · all calculations client-side.
+    </div>
+  </div>
+
+<script>
+/* ─────────────────────────────────────────────────────────
+   LEQUEST Yield Calculator
+   All money in SGD. Inputs persisted to localStorage.
+   ───────────────────────────────────────────────────────── */
+
+const STORAGE_KEY = 'lequestYield_v1';
+
+const DEFAULTS = {
+  // Acquisition
+  purchasePrice: 900000,
+  bsd: 27000,        // 3% (user-specified flat assumption)
+  absd: 63000,       // 7% (second property at the time)
+  legal: 3000,
+  reno: 0,
+
+  // Financing (loan now fully paid off; kept for what-if scenarios)
+  loanAmount: 0,
+  interestRate: 3.5,
+  loanYears: 30,
+
+  // CPF Ordinary Account used towards purchase
+  cpfUsed: 150000,        // S$ used from CPF OA
+  cpfRate: 2.5,           // CPF OA interest rate (% p.a.)
+  cpfYearsAccrued: 5,     // years since CPF was used (compounded at cpfRate)
+
+  // Income
+  monthlyRent: 3000,
+  vacancyPct: 5,
+
+  // Recurring costs
+  mcstMonthly: 300,
+  annualValue: 24000,    // for property tax (non-OO progressive)
+  insurance: 400,
+  agentMonthsPerYear: 0.5, // half month rent annually
+  incomeTaxRate: 0,        // optional, 0 = off
+
+  // Exit
+  currentValue: 1100000,
+  holdingYears: 5,
+  sellingCostPct: 2,
+  ssd: 0,
+};
+
+/* ── Property tax (non-owner-occupied, 2026 progressive) ── */
+function propertyTaxFromAV(av) {
+  if (av <= 0) return 0;
+  const tiers = [
+    { upTo: 30000,  rate: 0.12 },
+    { upTo: 45000,  rate: 0.20 },  // next 15k
+    { upTo: 60000,  rate: 0.28 },  // next 15k
+    { upTo: Infinity, rate: 0.36 },
+  ];
+  let tax = 0, prev = 0;
+  for (const t of tiers) {
+    const slice = Math.max(0, Math.min(av, t.upTo) - prev);
+    tax += slice * t.rate;
+    prev = t.upTo;
+    if (av <= t.upTo) break;
+  }
+  return tax;
+}
+
+/* ── Mortgage helpers ─────────────────────────────────────── */
+function monthlyPayment(P, annualRatePct, years) {
+  if (P <= 0 || years <= 0) return 0;
+  const r = (annualRatePct / 100) / 12;
+  const n = years * 12;
+  if (r === 0) return P / n;
+  return P * r / (1 - Math.pow(1 + r, -n));
+}
+
+function balanceAfterMonths(P, annualRatePct, years, monthsElapsed) {
+  if (P <= 0 || years <= 0) return 0;
+  const r = (annualRatePct / 100) / 12;
+  const n = years * 12;
+  const m = Math.min(monthsElapsed, n);
+  if (r === 0) return Math.max(0, P - (P / n) * m);
+  const pmt = monthlyPayment(P, annualRatePct, years);
+  return P * Math.pow(1 + r, m) - pmt * ((Math.pow(1 + r, m) - 1) / r);
+}
+
+/* ── IRR via bisection (works for typical ranges) ────────── */
+function npv(rate, cashflows) {
+  return cashflows.reduce((acc, cf, t) => acc + cf / Math.pow(1 + rate, t), 0);
+}
+function solveIRR(cashflows) {
+  let lo = -0.99, hi = 1.0;
+  let fLo = npv(lo, cashflows), fHi = npv(hi, cashflows);
+  // Expand hi if same sign
+  let tries = 0;
+  while (fLo * fHi > 0 && tries < 30) {
+    hi *= 2;
+    fHi = npv(hi, cashflows);
+    tries++;
+  }
+  if (fLo * fHi > 0) return null; // no sign change
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    const fMid = npv(mid, cashflows);
+    if (Math.abs(fMid) < 1e-6) return mid;
+    if (fLo * fMid < 0) { hi = mid; fHi = fMid; }
+    else                { lo = mid; fLo = fMid; }
+  }
+  return (lo + hi) / 2;
+}
+
+/* ── Core calculation ────────────────────────────────────── */
+function calculate(inp) {
+  // Acquisition
+  const totalAcq = inp.purchasePrice + inp.bsd + inp.absd + inp.legal + inp.reno;
+  const downPayment = Math.max(0, inp.purchasePrice - inp.loanAmount);
+  // Total capital put in (cash + CPF, excluding loan)
+  const totalCapitalInvested = downPayment + inp.bsd + inp.absd + inp.legal + inp.reno;
+  // Cash actually out of pocket (CPF portion does not come from cash)
+  const cpfUsed = Math.min(inp.cpfUsed, totalCapitalInvested);
+  const cashInvested = Math.max(0, totalCapitalInvested - cpfUsed);
+
+  // CPF accrued interest (compounded annually at cpfRate over cpfYearsAccrued)
+  const cpfAccrued = cpfUsed > 0 && inp.cpfYearsAccrued > 0
+    ? cpfUsed * (Math.pow(1 + inp.cpfRate / 100, inp.cpfYearsAccrued) - 1)
+    : 0;
+  const cpfRefund = cpfUsed + cpfAccrued;
+
+  // Income
+  const grossAnnualRent = inp.monthlyRent * 12;
+  const effectiveAnnualRent = grossAnnualRent * (1 - inp.vacancyPct / 100);
+
+  // Costs
+  const mcstAnnual = inp.mcstMonthly * 12;
+  const propTax = propertyTaxFromAV(inp.annualValue);
+  const agentAnnual = inp.monthlyRent * inp.agentMonthsPerYear;
+  const incomeTax = (effectiveAnnualRent - mcstAnnual - propTax - inp.insurance - agentAnnual) * (inp.incomeTaxRate / 100);
+  const incomeTaxAnnual = Math.max(0, incomeTax);
+  const totalAnnualExpenses = mcstAnnual + propTax + inp.insurance + agentAnnual + incomeTaxAnnual;
+
+  // Mortgage
+  const monthlyMortgage = monthlyPayment(inp.loanAmount, inp.interestRate, inp.loanYears);
+  const annualMortgage = monthlyMortgage * 12;
+
+  const netAnnualBeforeMortgage = effectiveAnnualRent - totalAnnualExpenses;
+  const netAnnualAfterMortgage = netAnnualBeforeMortgage - annualMortgage;
+
+  // Yields
+  const grossYield = grossAnnualRent / inp.purchasePrice;
+  const netYield = netAnnualBeforeMortgage / totalAcq;
+  // Cash-on-cash uses ACTUAL cash out of pocket (excluding CPF) — the more flattering view
+  const cashOnCash = cashInvested > 0 ? netAnnualAfterMortgage / cashInvested : null;
+  // Capital-on-capital uses cash + CPF (truer return-on-capital)
+  const capitalOnCapital = totalCapitalInvested > 0
+    ? netAnnualAfterMortgage / totalCapitalInvested : null;
+
+  // Break-even rent (monthly): rent where netAnnualAfterMortgage = 0,
+  // taking vacancy and agent commission into account.
+  // Let R = monthly rent.
+  // effective rent = 12*R*(1 - v)
+  // agent = R * agentMonthsPerYear
+  // incomeTaxAnnual ≈ taxRate * (effRent - mcst - propTax - insurance - agent), if positive
+  // Solve linearly assuming income tax is positive (otherwise zero).
+  let breakEvenRent;
+  {
+    const v = inp.vacancyPct / 100;
+    const tr = inp.incomeTaxRate / 100;
+    const a = inp.agentMonthsPerYear;
+    const fixedCosts = mcstAnnual + propTax + inp.insurance + annualMortgage;
+    // Without income tax:
+    // 12R(1-v) - a*R - fixedCosts = 0
+    // R = fixedCosts / (12(1-v) - a)
+    const denomNoTax = 12 * (1 - v) - a;
+    let R = denomNoTax > 0 ? fixedCosts / denomNoTax : NaN;
+    if (tr > 0 && Number.isFinite(R)) {
+      // With income tax positive:
+      // (1 - tr) * (12R(1-v) - a*R) - (mcst+tax+ins+annualMort) + tr*(mcst+tax+ins) = 0
+      // Wait: net = effRent - costs - mort, where costs include incomeTax = tr*(effRent - mcst-tax-ins-agent)
+      // net = effRent - (mcst+tax+ins+agent) - tr*(effRent - mcst-tax-ins-agent) - annualMort
+      //     = (1-tr)*(effRent - mcst-tax-ins-agent) - annualMort
+      // Set = 0:
+      // (1-tr)*(12R(1-v) - aR - (mcst+tax+ins)) = annualMort
+      // 12R(1-v) - aR = annualMort/(1-tr) + (mcst+tax+ins)
+      const rhs = annualMortgage / (1 - tr) + (mcstAnnual + propTax + inp.insurance);
+      R = denomNoTax > 0 ? rhs / denomNoTax : NaN;
+    }
+    breakEvenRent = R;
+  }
+
+  // IRR over holding period
+  const months = inp.holdingYears * 12;
+  const loanBalanceAtSale = balanceAfterMonths(inp.loanAmount, inp.interestRate, inp.loanYears, months);
+  const sellingCosts = inp.currentValue * (inp.sellingCostPct / 100) + inp.ssd;
+  const saleProceedsGross = inp.currentValue - sellingCosts - loanBalanceAtSale;
+
+  // CPF must be refunded to CPF OA at sale (principal + accrued interest).
+  // We project CPF accrued interest forward to the SALE date (not just "today")
+  const cpfYearsAtSale = Math.max(inp.cpfYearsAccrued, inp.holdingYears);
+  const cpfAccruedAtSale = cpfUsed > 0 && cpfYearsAtSale > 0
+    ? cpfUsed * (Math.pow(1 + inp.cpfRate / 100, cpfYearsAtSale) - 1)
+    : 0;
+  const cpfRefundAtSale = cpfUsed + cpfAccruedAtSale;
+  const cashProceedsAtSale = saleProceedsGross - cpfRefundAtSale;
+
+  // ---- IRR (two views) ----
+  // Cash-only view: only out-of-pocket cash; CPF refund stays in CPF (locked, ignored from "cash" perspective).
+  const cashFlowsCash = [-cashInvested];
+  for (let y = 1; y <= inp.holdingYears; y++) {
+    let cf = netAnnualAfterMortgage;
+    if (y === inp.holdingYears) cf += cashProceedsAtSale;
+    cashFlowsCash.push(cf);
+  }
+  const irrCash = inp.holdingYears > 0 && cashInvested > 0 ? solveIRR(cashFlowsCash) : null;
+
+  // Total-capital view: cash + CPF as initial; CPF principal + accrued counts as part of terminal recovery.
+  const cashFlowsTotal = [-totalCapitalInvested];
+  for (let y = 1; y <= inp.holdingYears; y++) {
+    let cf = netAnnualAfterMortgage;
+    if (y === inp.holdingYears) cf += saleProceedsGross;
+    cashFlowsTotal.push(cf);
+  }
+  const irrTotal = inp.holdingYears > 0 && totalCapitalInvested > 0 ? solveIRR(cashFlowsTotal) : null;
+
+  // Simple total return (cash perspective)
+  const totalCashOut = netAnnualAfterMortgage * inp.holdingYears + cashProceedsAtSale;
+  const totalReturn = cashInvested > 0 ? (totalCashOut - cashInvested) / cashInvested : null;
+
+  return {
+    totalAcq, downPayment, totalCapitalInvested, cashInvested,
+    cpfUsed, cpfAccrued, cpfRefund,
+    cpfAccruedAtSale, cpfRefundAtSale,
+    grossAnnualRent, effectiveAnnualRent,
+    mcstAnnual, propTax, agentAnnual, incomeTaxAnnual, totalAnnualExpenses,
+    monthlyMortgage, annualMortgage,
+    netAnnualBeforeMortgage, netAnnualAfterMortgage,
+    grossYield, netYield, cashOnCash, capitalOnCapital,
+    breakEvenRent,
+    loanBalanceAtSale, sellingCosts, saleProceedsGross, cashProceedsAtSale,
+    irrCash, irrTotal, totalReturn,
+  };
+}
+
+/* ── Formatters ──────────────────────────────────────────── */
+const fmtSGD = n => (n == null || !Number.isFinite(n)) ? '—' :
+  'S$' + Math.round(n).toLocaleString('en-SG');
+const fmtSGD0 = n => (n == null || !Number.isFinite(n)) ? '—' :
+  'S$' + Math.round(n).toLocaleString('en-SG');
+const fmtPct = (n, d=2) => (n == null || !Number.isFinite(n)) ? '—' :
+  (n * 100).toFixed(d) + '%';
+
+/* ── Field schema ────────────────────────────────────────── */
+const FIELDS = {
+  acqBody: [
+    ['purchasePrice', 'Purchase price', 'S$', 0],
+    ['bsd', 'Buyer Stamp Duty (BSD)', 'S$', 0],
+    ['absd', 'Add. Buyer Stamp Duty (ABSD)', 'S$', 0],
+    ['legal', 'Legal & misc fees', 'S$', 0],
+    ['reno', 'Renovation / furnishing', 'S$', 0],
+  ],
+  loanBody: [
+    ['loanAmount', 'Loan amount (0 = no loan)', 'S$', 0],
+    ['interestRate', 'Interest rate (% p.a.)', '%', 2],
+    ['loanYears', 'Loan tenure (years)', 'yr', 0],
+  ],
+  cpfBody: [
+    ['cpfUsed', 'CPF OA used towards purchase', 'S$', 0],
+    ['cpfRate', 'CPF OA interest rate (% p.a.)', '%', 2],
+    ['cpfYearsAccrued', 'Years CPF has been accruing', 'yr', 0],
+  ],
+  incomeBody: [
+    ['monthlyRent', 'Expected monthly rent', 'S$', 0],
+    ['vacancyPct', 'Vacancy assumption (%)', '%', 1],
+  ],
+  costsBody: [
+    ['mcstMonthly', 'MCST / maintenance (per month)', 'S$', 0],
+    ['annualValue', 'Annual Value (for property tax)', 'S$', 0],
+    ['insurance', 'Insurance (per year)', 'S$', 0],
+    ['agentMonthsPerYear', 'Agent commission (months/yr)', 'mo', 2],
+    ['incomeTaxRate', 'Income-tax rate on rental (%)', '%', 1],
+  ],
+  exitBody: [
+    ['currentValue', 'Current / projected sale price', 'S$', 0],
+    ['holdingYears', 'Holding period (years)', 'yr', 0],
+    ['sellingCostPct', 'Selling costs (%)', '%', 2],
+    ['ssd', 'Seller Stamp Duty (if any)', 'S$', 0],
+  ],
+};
+
+/* ── State ───────────────────────────────────────────────── */
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    return { ...DEFAULTS, ...(saved || {}) };
+  } catch { return { ...DEFAULTS }; }
+}
+function saveState(state) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+}
+let state = loadState();
+
+/* ── Rendering ───────────────────────────────────────────── */
+function renderInputs() {
+  for (const [containerId, fields] of Object.entries(FIELDS)) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = '';
+    for (const [key, label, unit, decimals] of fields) {
+      const row = document.createElement('div');
+      row.className = 'field';
+      row.innerHTML = `
+        <label>
+          ${label}
+          <span class="hint">${unit === 'S$' ? 'SGD' : unit}</span>
+        </label>
+        <input type="number" step="${decimals === 0 ? '1' : (decimals === 1 ? '0.1' : '0.01')}"
+               data-key="${key}" value="${state[key]}" />
+      `;
+      el.appendChild(row);
+    }
+  }
+}
+
+function renderOutputs() {
+  const r = calculate(state);
+
+  // KPI cards
+  const yieldClass = (y, good, warn) => y == null ? '' : (y >= good ? 'good' : (y >= warn ? 'warn' : 'bad'));
+  const irrClass = (i) => i == null ? '' : (i >= 0.06 ? 'good' : (i >= 0.03 ? 'warn' : 'bad'));
+
+  const kpi = document.getElementById('kpiGrid');
+  kpi.innerHTML = `
+    <div class="kpi ${yieldClass(r.grossYield, 0.04, 0.025)}">
+      <div class="label">Gross Yield</div>
+      <div class="value">${fmtPct(r.grossYield)}</div>
+      <div class="sub">Annual rent ÷ purchase price</div>
+    </div>
+    <div class="kpi ${yieldClass(r.netYield, 0.03, 0.01)}">
+      <div class="label">Net Yield</div>
+      <div class="value">${fmtPct(r.netYield)}</div>
+      <div class="sub">After expenses ÷ total acquisition</div>
+    </div>
+    <div class="kpi ${yieldClass(r.cashOnCash, 0.05, 0.02)}">
+      <div class="label">Cash-on-Cash</div>
+      <div class="value">${fmtPct(r.cashOnCash)}</div>
+      <div class="sub">Net cashflow ÷ cash out-of-pocket</div>
+    </div>
+    <div class="kpi ${irrClass(r.irrCash)}">
+      <div class="label">IRR · Cash view</div>
+      <div class="value">${fmtPct(r.irrCash)}</div>
+      <div class="sub">Excludes CPF; CPF refund deducted from sale</div>
+    </div>
+    <div class="kpi ${irrClass(r.irrTotal)}">
+      <div class="label">IRR · Total capital</div>
+      <div class="value">${fmtPct(r.irrTotal)}</div>
+      <div class="sub">Cash + CPF; CPF interest counted as return</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Break-even Rent</div>
+      <div class="value">${fmtSGD(r.breakEvenRent)}</div>
+      <div class="sub">Monthly rent for $0 net cashflow</div>
+    </div>
+  `;
+
+  // Cashflow breakdown
+  const cf = document.getElementById('cashflowTable');
+  cf.innerHTML = `
+    <tr><td>Gross annual rent (${fmtSGD(state.monthlyRent)} × 12)</td><td>${fmtSGD(r.grossAnnualRent)}</td></tr>
+    <tr class="subtle"><td>Less: vacancy (${state.vacancyPct}%)</td><td>−${fmtSGD(r.grossAnnualRent - r.effectiveAnnualRent)}</td></tr>
+    <tr><td><strong>Effective rent</strong></td><td><strong>${fmtSGD(r.effectiveAnnualRent)}</strong></td></tr>
+    <tr><td>MCST (${fmtSGD(state.mcstMonthly)} × 12)</td><td>−${fmtSGD(r.mcstAnnual)}</td></tr>
+    <tr><td>Property tax (AV ${fmtSGD(state.annualValue)})</td><td>−${fmtSGD(r.propTax)}</td></tr>
+    <tr><td>Insurance</td><td>−${fmtSGD(state.insurance)}</td></tr>
+    <tr><td>Agent commission (${state.agentMonthsPerYear} mo/yr)</td><td>−${fmtSGD(r.agentAnnual)}</td></tr>
+    ${state.incomeTaxRate > 0
+      ? `<tr><td>Income tax on rental (${state.incomeTaxRate}%)</td><td>−${fmtSGD(r.incomeTaxAnnual)}</td></tr>` : ''}
+    <tr><td><strong>Net before mortgage</strong></td><td><strong>${fmtSGD(r.netAnnualBeforeMortgage)}</strong></td></tr>
+    ${state.loanAmount > 0
+      ? `<tr><td>Mortgage (${fmtSGD(r.monthlyMortgage)} × 12)</td><td>−${fmtSGD(r.annualMortgage)}</td></tr>` : ''}
+    <tr class="total"><td>Net annual cashflow</td><td>${fmtSGD(r.netAnnualAfterMortgage)}</td></tr>
+  `;
+
+  // Acquisition table
+  const acq = document.getElementById('acqTable');
+  acq.innerHTML = `
+    <tr><td>Purchase price</td><td>${fmtSGD(state.purchasePrice)}</td></tr>
+    <tr><td>BSD</td><td>${fmtSGD(state.bsd)}</td></tr>
+    <tr><td>ABSD</td><td>${fmtSGD(state.absd)}</td></tr>
+    <tr><td>Legal &amp; misc</td><td>${fmtSGD(state.legal)}</td></tr>
+    <tr><td>Renovation</td><td>${fmtSGD(state.reno)}</td></tr>
+    <tr class="total"><td>Total acquisition cost</td><td>${fmtSGD(r.totalAcq)}</td></tr>
+    <tr class="subtle"><td>Down payment (price − loan)</td><td>${fmtSGD(r.downPayment)}</td></tr>
+    <tr class="subtle"><td> of which CPF OA</td><td>${fmtSGD(r.cpfUsed)}</td></tr>
+    <tr class="subtle"><td> of which actual cash</td><td>${fmtSGD(r.cashInvested)}</td></tr>
+    <tr><td><strong>Total capital invested (cash + CPF)</strong></td><td><strong>${fmtSGD(r.totalCapitalInvested)}</strong></td></tr>
+    ${state.loanAmount > 0 ? `
+      <tr><td>Loan balance at sale (yr ${state.holdingYears})</td><td>${fmtSGD(r.loanBalanceAtSale)}</td></tr>
+    ` : ''}
+    <tr><td>Selling costs (${state.sellingCostPct}%${state.ssd ? ' + SSD' : ''})</td><td>${fmtSGD(r.sellingCosts)}</td></tr>
+    <tr><td>Sale proceeds (gross of CPF refund)</td><td>${fmtSGD(r.saleProceedsGross)}</td></tr>
+    ${r.cpfUsed > 0 ? `
+      <tr class="subtle"><td> CPF refund: principal</td><td>−${fmtSGD(r.cpfUsed)}</td></tr>
+      <tr class="subtle"><td> CPF refund: accrued @ ${state.cpfRate}% over ${Math.max(state.cpfYearsAccrued, state.holdingYears)} yrs</td><td>−${fmtSGD(r.cpfAccruedAtSale)}</td></tr>
+    ` : ''}
+    <tr class="total"><td>Cash in hand at sale</td><td>${fmtSGD(r.cashProceedsAtSale)}</td></tr>
+  `;
+
+  // Notes
+  document.getElementById('notesBox').innerHTML = `
+    <strong>Assumptions used:</strong><br>
+    · Stamp duty taken as flat 3% BSD + 7% ABSD on $900K (override above if needed).<br>
+    · Property tax computed from Annual Value using Singapore's <em>non-owner-occupied</em> progressive rates: 12% / 20% / 28% / 36%.<br>
+    · Loan fully paid off (default loan = $0). Expand the Financing panel to model a what-if loan.<br>
+    · <strong>CPF OA</strong>: principal used + accrued interest at ${state.cpfRate}% must be refunded to your CPF OA at sale — deducted from cash proceeds. CPF assumed used at purchase (lump sum). Accrual projected to <em>sale date</em> (max of years-accrued and holding period).<br>
+    · <strong>IRR · Cash view</strong>: only your out-of-pocket cash counts; CPF stays in CPF. Tends to look higher.<br>
+    · <strong>IRR · Total capital</strong>: counts CPF as part of investment; CPF refund (principal + 2.5%) counted as part of return. Truer return-on-capital.<br>
+    · IRR solved numerically; cashflows assumed annual; single terminal sale.<br>
+    · All values local to your browser; nothing is sent anywhere.
+  `;
+}
+
+function render() {
+  renderInputs();
+  renderOutputs();
+}
+
+/* ── Wire up events ──────────────────────────────────────── */
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (t.matches('input[data-key]')) {
+    const key = t.dataset.key;
+    const val = parseFloat(t.value);
+    state[key] = Number.isFinite(val) ? val : 0;
+    saveState(state);
+    renderOutputs(); // skip re-rendering inputs to keep focus
+  }
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  if (confirm('Reset all inputs to LEQUEST defaults?')) {
+    state = { ...DEFAULTS };
+    saveState(state);
+    render();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
