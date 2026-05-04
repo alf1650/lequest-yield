@@ -1,0 +1,37 @@
+{
+  "lastUpdated": "2026-05-05T00:00:00Z",
+  "project": "LE QUEST",
+  "filter": {
+    "bedrooms": 2,
+    "area_sqft_min": 550,
+    "area_sqft_max": 850,
+    "months_window": 24
+  },
+  "lastTransacted": {
+    "date": "Feb 2026",
+    "price": 1200000,
+    "psf": 1689,
+    "area_sqft": 710,
+    "type": "Resale"
+  },
+  "stats": {
+    "count": 5,
+    "avg_price": 1168000,
+    "min_price": 1050000,
+    "max_price": 1280000,
+    "avg_psf": 1624,
+    "min_psf": 1512,
+    "max_psf": 1752
+  },
+  "transactions": [
+    {
+      "date": "Feb 2026",
+      "date_sort": "2026-02-01",
+      "price": 1200000,
+      "psf": 1689,
+      "area_sqft": 710,
+      "type": "Resale",
+      "floor": "13 to 15"
+    }
+  ]
+}

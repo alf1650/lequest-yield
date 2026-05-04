@@ -223,6 +223,79 @@
       border-radius: 8px;
       margin-bottom: 16px;
     }
+
+    /* Market data panel */
+    .market-panel {
+      background: white;
+      border-radius: 12px;
+      box-shadow: var(--card-shadow);
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .market-panel-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      font-weight: 700;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .market-panel-header .updated {
+      font-size: 11px;
+      color: var(--gray);
+      font-weight: 400;
+    }
+    .market-panel-body { padding: 16px 18px; }
+
+    .market-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .market-stat {
+      background: var(--gray-light);
+      border-radius: 8px;
+      padding: 12px 14px;
+      border-left: 3px solid var(--blue);
+    }
+    .market-stat .ms-label { font-size: 11px; color: var(--gray); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+    .market-stat .ms-value { font-size: 18px; font-weight: 700; color: var(--text); margin-top: 3px; }
+    .market-stat .ms-sub { font-size: 11px; color: var(--gray); margin-top: 2px; }
+    .market-stat.highlight { border-left-color: var(--green); }
+    .market-stat.highlight .ms-value { color: var(--green); }
+    .market-stat.neutral { border-left-color: var(--orange); }
+    .market-stat.neutral .ms-value { color: var(--orange); }
+
+    .market-txn-table {
+      width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px;
+    }
+    .market-txn-table th {
+      text-align: left; font-weight: 600; color: var(--gray);
+      padding: 5px 0; border-bottom: 2px solid var(--border); font-size: 11px;
+      text-transform: uppercase; letter-spacing: .3px;
+    }
+    .market-txn-table td { padding: 6px 0; border-bottom: 1px solid #f3f4f6; }
+    .market-txn-table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+    .market-txn-table tr:last-child td { border-bottom: none; }
+    .market-txn-table .badge-resale {
+      display: inline-block; background: var(--blue-light); color: var(--blue);
+      border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 600;
+    }
+    .market-txn-table .badge-new {
+      display: inline-block; background: var(--green-light); color: var(--green);
+      border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 600;
+    }
+    .market-skew {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+    .market-skew.above { background: var(--green-light); color: var(--green); }
+    .market-skew.below { background: var(--red-light); color: var(--red); }
+    .market-skew.at { background: var(--blue-light); color: var(--blue); }
+    .market-skew strong { font-weight: 700; }
   </style>
 </head>
 <body>
@@ -241,6 +314,15 @@
   <div class="container">
 
     <div class="kpi-grid" id="kpiGrid"></div>
+
+    <!-- ── MARKET DATA PANEL ─────────────────────────────────────── -->
+    <div class="market-panel" id="marketPanel" style="display:none;">
+      <div class="market-panel-header">
+        <span><span class="dot" style="background:var(--green);"></span>Market Prices · Le Quest 2-Bed / 2-Bath</span>
+        <span class="updated" id="marketUpdated"></span>
+      </div>
+      <div class="market-panel-body" id="marketBody"></div>
+    </div>
 
     <div class="layout">
       <!-- ── INPUTS ──────────────────────────────────────── -->
@@ -752,6 +834,114 @@ document.getElementById('btnReset').addEventListener('click', () => {
 });
 
 render();
+
+/* ── Market data (data.json) ─────────────────────────────────────── */
+function fmtSGDm(n) {
+  if (!n) return '—';
+  if (n >= 1000000) return 'S$' + (n / 1000000).toFixed(2) + 'M';
+  return 'S$' + Math.round(n).toLocaleString('en-SG');
+}
+
+function renderMarket(d) {
+  const panel = document.getElementById('marketPanel');
+  const body  = document.getElementById('marketBody');
+  const upd   = document.getElementById('marketUpdated');
+  if (!d) return;
+
+  // Format last updated
+  try {
+    const dt = new Date(d.lastUpdated);
+    upd.textContent = 'Updated ' + dt.toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch {}
+
+  const lt = d.lastTransacted;
+  const s  = d.stats || {};
+
+  // Compute skew vs user's purchase price
+  const purchasePsf = Math.round(state.purchasePrice / 710); // approx 710sqft
+  let skewHtml = '';
+  if (s.avg_psf) {
+    const diff = s.avg_psf - purchasePsf;
+    const pct  = ((diff / purchasePsf) * 100).toFixed(1);
+    if (diff > 50) {
+      skewHtml = `<div class="market-skew above">
+        <strong>Market is ~${pct}% above your purchase price</strong> — avg transactions at ${s.avg_psf} psf vs your ~${purchasePsf} psf
+      </div>`;
+    } else if (diff < -50) {
+      skewHtml = `<div class="market-skew below">
+        <strong>Market is ~${Math.abs(pct)}% below your purchase price</strong> — avg transactions at ${s.avg_psf} psf vs your ~${purchasePsf} psf
+      </div>`;
+    } else {
+      skewHtml = `<div class="market-skew at">
+        Market is roughly in line with your purchase price — avg ${s.avg_psf} psf vs your ~${purchasePsf} psf
+      </div>`;
+    }
+  }
+
+  // Recent transactions table
+  const txns = (d.transactions || []).slice(0, 6);
+  const txnRows = txns.map(t => {
+    const badge = (t.type || '').toLowerCase().includes('new')
+      ? `<span class="badge-new">New</span>`
+      : `<span class="badge-resale">Resale</span>`;
+    const floor = t.floor ? ` · Fl ${t.floor}` : '';
+    return `<tr>
+      <td>${t.date}${floor} ${badge}</td>
+      <td>${fmtSGDm(t.price)}</td>
+      <td>${t.psf ? t.psf + ' psf' : '—'}</td>
+      <td>${t.area_sqft ? t.area_sqft + ' sqft' : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  const txnTable = txns.length ? `
+    <div style="margin-top:12px;">
+      <div style="font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">
+        Recent 2BR Transactions (URA)
+      </div>
+      <table class="market-txn-table">
+        <thead><tr>
+          <th>Date / Floor</th><th style="text-align:right;">Price</th>
+          <th style="text-align:right;">PSF</th><th style="text-align:right;">Size</th>
+        </tr></thead>
+        <tbody>${txnRows}</tbody>
+      </table>
+    </div>` : '';
+
+  body.innerHTML = `
+    <div class="market-grid">
+      <div class="market-stat highlight">
+        <div class="ms-label">Last Transacted</div>
+        <div class="ms-value">${lt ? fmtSGDm(lt.price) : '—'}</div>
+        <div class="ms-sub">${lt ? lt.date + ' · ' + lt.psf + ' psf · ' + lt.area_sqft + ' sqft' : ''}</div>
+      </div>
+      <div class="market-stat">
+        <div class="ms-label">Avg PSF (${d.filter ? d.filter.months_window : 24}m)</div>
+        <div class="ms-value">${s.avg_psf ? 'S$' + s.avg_psf : '—'}</div>
+        <div class="ms-sub">${s.count ? s.count + ' transactions' : ''}</div>
+      </div>
+      <div class="market-stat neutral">
+        <div class="ms-label">PSF Range</div>
+        <div class="ms-value">${s.min_psf && s.max_psf ? s.min_psf + '–' + s.max_psf : '—'}</div>
+        <div class="ms-sub">min – max psf</div>
+      </div>
+      <div class="market-stat">
+        <div class="ms-label">Price Range</div>
+        <div class="ms-value">${s.min_price ? fmtSGDm(s.min_price) : '—'}</div>
+        <div class="ms-sub">${s.max_price ? 'to ' + fmtSGDm(s.max_price) : ''}</div>
+      </div>
+    </div>
+    ${skewHtml}
+    ${txnTable}
+  `;
+
+  panel.style.display = '';
+}
+
+// Load data.json (works on GitHub Pages; silently skipped on file://)
+fetch('data.json')
+  .then(r => r.ok ? r.json() : null)
+  .then(d => { if (d) renderMarket(d); })
+  .catch(() => {/* silently ignore when running locally via file:// */});
 </script>
 </body>
 </html>
