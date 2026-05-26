@@ -11,6 +11,7 @@ import json
 import sys
 import urllib.parse
 import urllib.request
+import urllib.error
 from datetime import datetime, timezone, date
 from pathlib import Path
 
@@ -252,7 +253,22 @@ def process(records: list[dict]) -> dict:
 # ── MAIN ─────────────────────────────────────────────────────────────────
 def main():
     print(f"Fetching URA transactions for '{PROJECT_NAME}' …")
-    records = fetch_all_records(URA_RESOURCE_ID, PROJECT_NAME)
+    try:
+        records = fetch_all_records(URA_RESOURCE_ID, PROJECT_NAME)
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, RuntimeError) as exc:
+        # data.gov endpoints and resource IDs can change; keep last known good data if available.
+        if OUT_PATH.exists():
+            print(f"WARN: live fetch failed ({exc}); keeping cached {OUT_PATH.name}", file=sys.stderr)
+            cached = json.loads(OUT_PATH.read_text())
+            cached["lastAttemptedUpdate"] = datetime.now(timezone.utc).isoformat()
+            cached["sourceError"] = str(exc)
+            cached["sourceStatus"] = "stale"
+            OUT_PATH.write_text(json.dumps(cached, indent=2))
+            print("Using cached market data.")
+            return
+        print(f"ERROR: live fetch failed and no cached data is available: {exc}", file=sys.stderr)
+        raise
+
     print(f"Total raw records: {len(records)}")
 
     result = process(records)

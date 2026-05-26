@@ -33,5 +33,8 @@
       "type": "Resale",
       "floor": "13 to 15"
     }
-  ]
+  ],
+  "lastAttemptedUpdate": "2026-05-26T08:07:31.392921+00:00",
+  "sourceError": "HTTP Error 404: Not Found",
+  "sourceStatus": "stale"
 }
